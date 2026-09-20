@@ -68,6 +68,5 @@ This scraper follows a few rules so it never puts unnecessary load on the site:
 - Why: it is a public sandbox built specifically for practicing scraping
 - Scope: only the first 3 catalogue pages (60 books total)
 - Data collected: title, price, availability, rating, description
-- robots.txt result: [paste what you saw, or write "no robots file found"]
 
-I will not reuse this code on another site without checking its rules and terms first.
+## Fin.
