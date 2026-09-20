@@ -1,3 +1,6 @@
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
+import time
 import requests
 import os
 
@@ -34,5 +37,41 @@ def fetch_page(url, cache_filename):
     return html
 
 
+def discover_book_links():
+    """Visits catalogue pages 1-3 and collects every unique book URL."""
+    all_links = []
+    page_url = BASE_URL + "catalogue/page-1.html"
+    page_num = 1
+
+    while page_url and page_num <= 3:
+        cache_name = f"catalogue-page-{page_num}.html"
+        was_cached = os.path.exists(os.path.join(CACHE_DIR, cache_name))
+
+        html = fetch_page(page_url, cache_name)
+        soup = BeautifulSoup(html, "html.parser")
+
+        # Every book on the page has a link inside an <h3><a href="..."> tag
+        for tag in soup.select("h3 a"):
+            relative_link = tag["href"]
+            full_link = urljoin(page_url, relative_link)
+            all_links.append(full_link)
+
+        # Only wait if we actually hit the real site (not when reading from cache)
+        if not was_cached:
+            time.sleep(0.5)
+
+        # Find the "next" button to go to the next page
+        next_tag = soup.select_one("li.next a")
+        if next_tag:
+            page_url = urljoin(page_url, next_tag["href"])
+            page_num += 1
+        else:
+            page_url = None
+
+    unique_links = list(dict.fromkeys(all_links))  # removes duplicates, keeps order
+    print(f"catalogue_pages={page_num} discovered={len(all_links)} unique_urls={len(unique_links)}")
+    return unique_links
+
+
 if __name__ == "__main__":
-    fetch_page(BASE_URL + "catalogue/page-1.html", "catalogue-page-1.html")
+    links = discover_book_links()
