@@ -5,6 +5,9 @@ import requests
 import os
 from datetime import datetime, timezone
 import re
+from pydantic import BaseModel, ValidationError
+import json
+import hashlib
 
 BASE_URL = "https://books.toscrape.com/"
 CACHE_DIR = "cache"
@@ -77,7 +80,7 @@ def discover_book_links():
 
 def extract_book(book_url, source_page):
     """Fetches one book's page and pulls out its raw details."""
-    cache_name = re.sub(r"[^a-zA-Z0-9]+", "-", book_url) + ".html"
+    cache_name = hashlib.md5(book_url.encode()).hexdigest() + ".html"
     was_cached = os.path.exists(os.path.join(CACHE_DIR, cache_name))
 
     html = fetch_page(book_url, cache_name)
@@ -110,8 +113,58 @@ def extract_book(book_url, source_page):
     }
 
 
+class Book(BaseModel):
+    title: str
+    product_url: str
+    price_gbp: float
+    price_text: str
+    availability_text: str
+    rating_text: str | None
+    description: str | None
+    source_page: str
+    fetched_at: str
+
+
+def normalize(raw):
+    """Converts raw scraped text into clean typed values."""
+    price_number = float(raw["price_text"].replace("£", "").strip())
+    return {
+        "title": raw["title"],
+        "product_url": raw["product_url"],
+        "price_gbp": price_number,
+        "price_text": raw["price_text"],
+        "availability_text": raw["availability_text"],
+        "rating_text": raw["rating_text"],
+        "description": raw["description"],
+        "source_page": raw["source_page"],
+        "fetched_at": raw["fetched_at"],
+    }
+
+
+def validate_and_store(raw_records):
+    """Checks every record against the schema and writes good/bad ones separately."""
+    good_records = {}  # keyed by product_url so duplicates overwrite instead of piling up
+    bad_records = []
+
+    for raw in raw_records:
+        try:
+            clean = normalize(raw)
+            book = Book(**clean)
+            good_records[book.product_url] = book.model_dump()
+        except (ValidationError, ValueError) as e:
+            bad_records.append({"record": raw, "reason": str(e)})
+
+    os.makedirs("output", exist_ok=True)
+    with open("output/books.json", "w", encoding="utf-8") as f:
+        json.dump(list(good_records.values()), f, indent=2)
+    with open("output/errors.json", "w", encoding="utf-8") as f:
+        json.dump(bad_records, f, indent=2)
+
+    print(f"valid={len(good_records)} invalid={len(bad_records)}")
+    return len(good_records), len(bad_records)
+
+
 if __name__ == "__main__":
     links = discover_book_links()
     raw_records = [extract_book(url, BASE_URL + "catalogue/page-1.html") for url in links]
-    print(raw_records[0])
-    print(f"detail_pages={len(raw_records)}")
+    validate_and_store(raw_records)
