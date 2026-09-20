@@ -1,20 +1,20 @@
 ## How to run it
 
-1. Clone this repo and move into the scraper folder:
+## 1. Clone this repo and move into the scraper folder:
 
 git clone https://github.com/AbdulMooiz/flyrank-the-polite-scraper.git
 cd yourrepo/scraper
 
-2. Create a virtual environment and activate it:
+## 2. Create a virtual environment and activate it:
 
 python -m venv venv
 venv\Scripts\Activate.ps1
 
-3. Install the dependencies:
+## 3. Install the dependencies:
 
 pip install requests beautifulsoup4 pydantic
 
-4. Run the scraper:
+## 4. Run the scraper:
 
 python src\main.py
 
