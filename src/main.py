@@ -165,6 +165,33 @@ def validate_and_store(raw_records):
 
 
 if __name__ == "__main__":
+    start_time = datetime.now(timezone.utc)
+
     links = discover_book_links()
-    raw_records = [extract_book(url, BASE_URL + "catalogue/page-1.html") for url in links]
-    validate_and_store(raw_records)
+    links.append(BASE_URL + "catalogue/this-page-does-not-exist_9999/index.html")  # deliberate fake link to test failure handling
+
+    raw_records = []
+    failed_pages = 0
+
+    for url in links:
+        try:
+            raw_records.append(extract_book(url, BASE_URL + "catalogue/page-1.html"))
+        except requests.exceptions.RequestException as e:
+            print(f"FAILED: {url} ({e})")
+            failed_pages += 1
+
+    valid_count, invalid_count = validate_and_store(raw_records)
+
+    end_time = datetime.now(timezone.utc)
+    report = {
+        "start_time": start_time.isoformat(),
+        "duration_seconds": (end_time - start_time).total_seconds(),
+        "pages_fetched": len(links),
+        "valid_records": valid_count,
+        "invalid_records": invalid_count,
+        "failed_pages": failed_pages,
+    }
+    with open("output/run-report.json", "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=2)
+
+    print(report)
