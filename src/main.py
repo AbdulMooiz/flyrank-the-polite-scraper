@@ -3,6 +3,8 @@ from urllib.parse import urljoin
 import time
 import requests
 import os
+from datetime import datetime, timezone
+import re
 
 BASE_URL = "https://books.toscrape.com/"
 CACHE_DIR = "cache"
@@ -73,5 +75,43 @@ def discover_book_links():
     return unique_links
 
 
+def extract_book(book_url, source_page):
+    """Fetches one book's page and pulls out its raw details."""
+    cache_name = re.sub(r"[^a-zA-Z0-9]+", "-", book_url) + ".html"
+    was_cached = os.path.exists(os.path.join(CACHE_DIR, cache_name))
+
+    html = fetch_page(book_url, cache_name)
+    soup = BeautifulSoup(html, "html.parser")
+
+    if not was_cached:
+        time.sleep(0.5)
+
+    product = soup.select_one("div.product_main")
+    title = product.select_one("h1").get_text(strip=True)
+    price_text = product.select_one("p.price_color").get_text(strip=True)
+    availability_text = product.select_one("p.availability").get_text(strip=True)
+
+    # Rating is stored as a CSS class like "star-rating Three"
+    rating_tag = product.select_one("p.star-rating")
+    rating_text = rating_tag["class"][1] if rating_tag else None
+
+    desc_tag = soup.select_one("#product_description ~ p")
+    description = desc_tag.get_text(strip=True) if desc_tag else None
+
+    return {
+        "title": title,
+        "product_url": book_url,
+        "price_text": price_text,
+        "availability_text": availability_text,
+        "rating_text": rating_text,
+        "description": description,
+        "source_page": source_page,
+        "fetched_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 if __name__ == "__main__":
     links = discover_book_links()
+    raw_records = [extract_book(url, BASE_URL + "catalogue/page-1.html") for url in links]
+    print(raw_records[0])
+    print(f"detail_pages={len(raw_records)}")
